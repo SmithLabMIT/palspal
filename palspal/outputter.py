@@ -257,62 +257,72 @@ class PFCOutFile:
         self.path = Path(path) if path else None
         self._raw_lines = []
 
-        self.time_scale_ns_per_channel = None
-        self.area_range_start_ch = None
-        self.area_range_end_ch = None
-        self.fit_range_start_ch = None
-        self.fit_range_end_ch = None
+        # Block 2 data (Spectrum)
+        self.spectrum_path = None
+        self.spectrum_label = None
+        self.timescale = None
+
+        # Block 3 data (CHANNEL RANGES. TIME SCALE. TIME-ZERO)
+        self.area = None
+        self.fit = None
+        self.timescale = None
+
+        # Block 4 data (RESOLUTION FUNCTION)
         self.res_fwhm = None
         self.res_intensity = None
         self.res_shift = None
+
+
+        # TODO: add initial parameters
+
 
         # Before source correction
         self.no_corr_converged = None
         self.no_corr_iterations = None
         self.no_corr_chi_square = None
         self.no_corr_dof = None
-        self.no_corr_reduced_chi_square = None
-        self.no_corr_reduced_chi_square_std = None
+        self.no_corr_reduced_chi2 = None
+        self.no_corr_reduced_chi2_std = None
 
-        self.no_corr_lifetime = None
-        self.no_corr_lifetime_std = None
-        self.no_corr_intensity = None
-        self.no_corr_intensity_std = None
+        self.no_corr_lt = None  # TODO
+        self.no_corr_lt_std = None  # TODO
+        self.no_corr_int = None
+        self.no_corr_int_std = None
 
-        self.no_corr_background = None
-        self.no_corr_background_std = None
-        self.no_corr_time_zero = None
-        self.no_corr_time_zero_std = None
+        self.no_corr_bg = None  # TODO
+        self.no_corr_bg_std = None  # TODO
+        self.no_corr_timezero = None  # TODO
+        self.no_corr_timezero_std = None  # TODO
 
-        self.no_corr_total_area_fit = None
-        self.no_corr_total_area_table = None
+        self.no_corr_total_area_fit = None  # TODO
+        self.no_corr_total_area_table = None  # TODO
 
         # Source Correction
-        self.source_lifetime = None
-        self.source_intensity = None
-        self.source_total = None
+        self.source_lifetime = None  # TODO
+        self.source_intensity = None  # TODO
+        self.source_total = None  # TODO
 
         # After source correction / Final results
-        self.converged = None
-        self.iterations = None
-        self.chi_square = None
-        self.dof = None
-        self.reduced_chi_square = None
-        self.reduced_chi_square_std = None
-        self.lifetime = None
-        self.lifetime_std = None
-        self.sigma = None
-        self.sigma_std = None
-        self.intensity = None
-        self.intensity_std = None
-        self.mean_lifetime = None
-        self.mean_lifetime_std = None
-        self.background = None
-        self.background_std = None
-        self.time_zero = None
-        self.time_zero_std = None
-        self.total_area_fit = None
-        self.total_area_table = None
+        self.converged = None  # TODO
+        self.iterations = None  # TODO
+        self.chi2 = None  # TODO
+        self.dof = None  # TODO
+        self.reduced_chi2 = None  # TODO
+        self.reduced_chi2_std = None  # TODO
+        self.lt = None  # TODO
+        self.lt_std = None  # TODO
+        self.sigma = None  # TODO
+        self.sigma_std = None  # TODO
+        self.int = None # TODO
+        self.int_std = None  # TODO
+        self.mean_lt = None  # TODO
+        self.mean_lt_std = None  # TODO
+        self.bg = None  # TODO
+        self.bg_std = None  # TODO
+        self.timezero = None  # TODO
+        self.timezero_std = None  # TODO
+        self.total_area_fit = None  # TODO
+        self.total_area_table = None  # TODO
 
     @classmethod
     def read(cls, file_in):
@@ -359,6 +369,7 @@ class PFCOutFile:
         in_initial = False
         in_no_corr_results = False
         in_source_corr = False
+        no_source_corr = False
         in_final = False
 
         # ---- small helper ----
@@ -397,7 +408,7 @@ class PFCOutFile:
                 in_initial = False
                 in_no_corr_results = False
                 in_source_corr = False
-                # final still coming; keep in_final False until we hit FINAL RESULTS banner
+                no_source_corr = True 
                 continue
 
             if "####################### F I N A L  R E S U L T S #######################" in line:
@@ -407,8 +418,10 @@ class PFCOutFile:
                 in_final = True
                 continue
 
-            # When we hit the end banner, stop parsing final
             if "######################### P O S I T R O N F I T ########################" in line:
+                in_initial = False
+                in_no_corr_results = False
+                in_source_corr = False
                 in_final = False
                 continue
 
@@ -417,40 +430,38 @@ class PFCOutFile:
             # -------------------------
             if has(line, "TIME SCALE") and ":" in line:
                 vals = self._floats_in_line(line)
-                if vals:
-                    self.time_scale_ns_per_channel = float(vals[0])
+                #if vals:
+                self.timescale = float(vals[0])
                 continue
 
             if has(line, "AREA RANGE") and "STARTS IN CH" in line and "ENDS IN CH" in line:
                 vals = self._floats_in_line(line)
-                if len(vals) >= 2:
-                    self.area_range_start_ch = int(vals[0])
-                    self.area_range_end_ch = int(vals[1])
+                #if len(vals) >= 2:
+                self.area = [int(vals[0]), int(vals[1])]
                 continue
 
             if has(line, "FIT RANGE") and "STARTS IN CH" in line and "ENDS IN CH" in line:
                 vals = self._floats_in_line(line)
-                if len(vals) >= 2:
-                    self.fit_range_start_ch = int(vals[0])
-                    self.fit_range_end_ch = int(vals[1])
+                #if len(vals) >= 2:
+                self.fit = [int(vals[0]), int(vals[1])]
                 continue
 
             if has(line, "RESOLUTION") and has(line, "FWHM (NS)") and ":" in line:
                 vals = self._floats_in_line(line)
-                if vals:
-                    self.res_fwhm = [float(x) for x in vals]  # can be 1 or 2 values
+                #if vals:
+                self.res_fwhm = [float(x) for x in vals]
                 continue
 
             if has(line, "FUNCTION") and has(line, "INTENSITIES") and ":" in line:
                 vals = self._floats_in_line(line)
-                if vals:
-                    self.res_intensity = [float(x) for x in vals]
+                #if vals:
+                self.res_int = [float(x) for x in vals]
                 continue
 
             if has(line, "SHIFTS (NS)") and ":" in line:
                 vals = self._floats_in_line(line)
-                if vals:
-                    self.res_shift = [float(x) for x in vals]
+                #if vals:
+                self.res_shift = [float(x) for x in vals]
                 continue
 
             # -------------------------
@@ -459,14 +470,15 @@ class PFCOutFile:
             if in_initial:
                 if line.strip().startswith("TIME-ZERO"):
                     vals = self._floats_in_line(line)
-                    if vals:
-                        self.init_time_zero = float(vals[0])
+                    #if vals:
+                    self.init_timezero = float(vals[0])
+                    # TODO: NEED TO FIX F vs G on end of time-zero
                     continue
 
-                if line.strip().startswith("LIFETIMES (NS)"):
+                if line.strip().startswith("LIFETIMES"):
                     vals = self._floats_in_line(line)
-                    if vals:
-                        self.init_lifetime = [float(x) for x in vals]
+                    #if vals:
+                    self.init_lifetime = [float(x) for x in vals]
                     continue
 
                 if line.strip().startswith("SIGMA (NS)"):
@@ -507,7 +519,7 @@ class PFCOutFile:
                 if "LIFETIMES (NS)" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.no_corr_lifetime = [float(x) for x in vals]
+                        self.no_corr_lt = [float(x) for x in vals]
                     continue
 
                 if "SIGMA (NS)" in line and ":" in line:
@@ -531,7 +543,7 @@ class PFCOutFile:
                 if line.strip().startswith("TIME-ZERO"):
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.no_corr_time_zero = float(vals[0])
+                        self.no_corr_timezero = float(vals[0])
                     continue
 
                 if line.strip().startswith("TOTAL AREA"):
@@ -549,7 +561,7 @@ class PFCOutFile:
                 if "LIFETIMES (NS)" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.source_lifetime = [float(x) for x in vals]
+                        self.source_lt = [float(x) for x in vals]
                     continue
 
                 if "INTENSITIES (%)" in line and ":" in line:
@@ -581,29 +593,29 @@ class PFCOutFile:
                 if "CHI-SQUARE" in line and "DEGREES OF FREEDOM" in line:
                     vals = self._floats_in_line(line)
                     if len(vals) >= 2:
-                        self.chi_square = float(vals[0])
+                        self.chi2 = float(vals[0])
                         self.dof = int(vals[1])
                     continue
 
                 if "REDUCED CHI-SQUARE" in line:
                     vals = self._floats_in_line(line)
                     if len(vals) >= 2:
-                        self.reduced_chi_square = float(vals[0])
-                        self.reduced_chi_square_std = float(vals[1])
+                        self.reduced_chi2 = float(vals[0])
+                        self.reduced_chi2_std = float(vals[1])
                     continue
 
                 # lifetimes and lifetime stddevs
                 if "LIFETIMES (NS)" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.lifetime = [float(x) for x in vals]
+                        self.lt = [float(x) for x in vals]
                     continue
 
-                if line.strip().startswith("STD DEVIATIONS") and (self.lifetime is not None) and (self.lifetime_std is None):
+                if line.strip().startswith("STD DEVIATIONS") and (self.lt is not None) and (self.lt_std is None):
                     # first "STD DEVIATIONS" after lifetimes can include FIXED
                     vals = self._stddevs_in_line_allow_fixed(line)
                     if vals:
-                        self.lifetime_std = vals
+                        self.lt_std = vals
                     continue
 
                 # sigma and sigma stddevs (can be *****)
@@ -622,52 +634,52 @@ class PFCOutFile:
                 if "INTENSITIES (%)" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.intensity = [float(x) for x in vals]
+                        self.int = [float(x) for x in vals]
                     continue
 
-                if line.strip().startswith("STD DEVIATIONS") and (self.intensity is not None) and (self.intensity_std is None):
+                if line.strip().startswith("STD DEVIATIONS") and (self.int is not None) and (self.int_std is None):
                     vals = self._stddevs_in_line_allow_fixed(line)
                     if vals:
-                        self.intensity_std = vals
+                        self.int_std = vals
                     continue
 
                 # mean lifetime + std
                 if "MEAN LIFETIME" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.mean_lifetime = float(vals[0])
+                        self.mean_lt = float(vals[0])
                     continue
 
-                if line.strip().startswith("STD DEVIATION") and ("mean_lifetime" in self.__dict__) and (self.mean_lifetime_std is None):
+                if line.strip().startswith("STD DEVIATION") and ("mean_lifetime" in self.__dict__) and (self.mean_lt_std is None):
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.mean_lifetime_std = float(vals[0])
+                        self.mean_lt_std = float(vals[0])
                     continue
 
                 # background + std
                 if line.strip().startswith("BACKGROUND"):
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.background = float(vals[0])
+                        self.bg = float(vals[0])
                     continue
 
-                if line.strip().startswith("STD DEVIATIONS") and (self.background is not None) and (self.background_std is None):
+                if line.strip().startswith("STD DEVIATIONS") and (self.bg is not None) and (self.bg_std is None):
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.background_std = float(vals[0])
+                        self.bg_std = float(vals[0])
                     continue
 
                 # time-zero + std
                 if line.strip().startswith("TIME-ZERO"):
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.time_zero = float(vals[0])
+                        self.timezero = float(vals[0])
                     continue
 
-                if line.strip().startswith("STD DEVIATIONS") and (self.time_zero is not None) and (self.time_zero_std is None):
+                if line.strip().startswith("STD DEVIATIONS") and (self.timezero is not None) and (self.timezero_std is None):
                     vals = self._floats_in_line(line)
                     if vals:
-                        self.time_zero_std = float(vals[0])
+                        self.timezero_std = float(vals[0])
                     continue
 
                 # total area

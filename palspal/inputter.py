@@ -1,4 +1,6 @@
 """palsfit.writer"""
+import platform
+import re
 import subprocess
 from pathlib import Path
 
@@ -165,7 +167,7 @@ class RFCFile:
         pos += self.res_components
 
         self.res_intensity = []
-        for k in range(self.res_intensity):
+        for k in range(self.res_components):
             self.res_intensity.append(float(toks[pos + k]))
         pos += self.res_components
 
@@ -362,7 +364,14 @@ class RFCFile:
         if self.path is None:
             raise ValueError("RFCFile.path is None.")
 
-        exe_path = Path(exe_path)
+        # If running on Linux (e.g. WSL), convert a Windows-style path to Linux if needed
+        path_str = str(exe_path)
+        if platform.system() != "Windows" and re.match(r'^[a-zA-Z]:\\', path_str):
+            drive = path_str[0].lower()             # 'c'
+            rest  = path_str[2:].replace('\\', '/') # '/Program Files/PATFIT19/res19.exe'
+            exe_path = Path(f"/mnt/{drive}{rest}")
+        else:
+            exe_path = Path(exe_path)
         rfc_path = Path(self.path)
 
         if not exe_path.exists():
@@ -450,8 +459,8 @@ class PFCFile:
         self.lt = None  # Lifetimes (ns)
         self.ln_constraint = None  # Whether log-normal components are guessed or fixed (e.g., "GFF")
         self.ln_broadening = None  # (ns)
-        self.int_constraint = None # If m=0, relative intensities fixed, if m>0, TODO
-        self.int_constraint_info = None  # TODO
+        self.num_int_constraint = None # m=0, relative intensities free; m>0 relative intensities fixed; m<0 relative intensities linear combo
+        self.int_constraint = None  # nested arrays of either [[fixed_int_index] [fixed_ints]] or [[lin_combo_1]...[lin_combo_j]]
         self.lt_components_2 = None  # Number of lifetime components in the material
         self.lt_constraint_2 = None  # Whether components are guessed or fixed (e.g., "GFF")
         self.lt_2 = None  # Lifetimes (ns)
@@ -461,7 +470,7 @@ class PFCFile:
         self.int_constraint_info_2 = None  # TODO
 
         # Block 6 data (BACKGROUND CONSTRAINTS)
-        self.bg_constraint = None  # 0=No constraint, 1=fit area between channels in self.bg_channels, 2=fit area specified in self.bg_fixed
+        self.bg_constraint = None  # 0=No constraint, 1=fit area between channels in self.bg_channels, 2=fit background specified in self.bg_fixed
         self.bg_channels = None
         self.bg_fixed = None
 
@@ -619,7 +628,33 @@ class PFCFile:
         for k in range(self.lt_components):
             self.ln_broadening.append(float(toks[pos + k]))
 
-        # TODO: figure out potential second iter needed
+        pos += self.lt_components
+        if pos < header_idx_6:
+            self.num_int_constraint = int(toks[pos])
+
+            pos += 1
+            self.int_constraint = []
+            if self.num_int_constraint > 0:
+                int_index = []
+                for k in range(self.num_int_constraint):
+                    int_index.append(int(toks[pos + k]))
+                self.int_constraint.append(int_index)
+
+                pos += self.num_int_constraint
+                int_val = []
+                for k in range(self.num_int_constraint):
+                    int_val.append(float(toks[pos + k]))
+                self.int_constraint.append(int_val)
+
+            elif self.num_int_constraint < 0:
+                for _ in range(abs(self.num_int_constraint)):
+                    lin_combo = []
+                    for k in range(self.lt_components):
+                        lin_combo(float(toks[pos + k]))
+                    pos += self.lt_components
+                    self.int_constraint.append(lin_combo)
+
+            # TODO: figure out potential second iter needed
 
         #==========================BLOCK 6============================
         toks = self.tokenize(self._raw_lines[header_idx_6 + 1 :header_idx_7])
@@ -770,6 +805,7 @@ class PFCFile:
         lt = as_list(self.lt, [0.0] * lt_components)
         ln_constraint = as_str(self.ln_constraint, "X" * lt_components)
         ln_broadening = as_list(self.ln_broadening, [0.0] * lt_components)
+        num_int_constraint = as_int(self.num_int_constraint, 0)
 
         bg_constraint = as_int(self.bg_constraint, 0)
         area_constraint = as_int(self.area_constraint, 0)
@@ -841,14 +877,14 @@ class PFCFile:
         new_lines.append(f"{ln_constraint}\n")
         new_lines.append("".join(f"{as_float(x):>10.4f}" for x in ln_broadening) + "\n")
 
-        new_lines.append(f"{as_int(self.int_constraint):>10d}\n")
-        if self.int_constraint is not None:
-            if self.int_constraint_info is not None:
-                if isinstance(self.int_constraint_info, (list, tuple)):
-                    new_lines.append(" ".join(str(x) for x in self.int_constraint_info) + "\n")
-                else:
-                    new_lines.append(f"{self.int_constraint_info}\n")
-
+        new_lines.append(f"{as_int(num_int_constraint):>10d}\n")
+        if self.num_int_constraint > 0:
+            new_lines.append(" ".join(f"{as_int(x):>10d}" for x in self.int_constraint[0]) + "\n")
+            new_lines.append(" ".join(f"{as_float(x):>10.4f}" for x in self.int_constraint[1]) + "\n")
+        elif self.num_int_constraint < 0:
+            for j in range(self.num_int_constraint):
+                new_lines.append(" ".join(f"{as_float(x):>10.4f}" for x in self.int_constraint[j]) + "\n")
+            
         if self.lt_components_2 is not None:
             lt_components_2 = as_int(self.lt_components_2, 1)
             lt_constraint_2 = as_str(self.lt_constraint_2, "F" * lt_components_2)
@@ -891,7 +927,7 @@ class PFCFile:
             new_lines.append(f"{as_int(bg_channels[1], 0):>10d}\n")
 
         elif bg_constraint == 2:
-            new_lines.append(f"{as_float(self.bg_fixed, 0.0):>10.5f}\n")
+            new_lines.append(f"{as_float(self.bg_fixed, 0.0):>11.5f}\n")
 
         # ========================== BLOCK 7 ============================
         new_lines.append(f"{self.POSITRON_HEADER_7}\n")
@@ -970,7 +1006,14 @@ class PFCFile:
         if self.path is None:
             raise ValueError("PFCFile.path is None.")
 
-        exe_path = Path(exe_path)
+        # If running on Linux (e.g. WSL), convert a Windows-style path to Linux if needed
+        path_str = str(exe_path)
+        if platform.system() != "Windows" and re.match(r'^[a-zA-Z]:\\', path_str):
+            drive = path_str[0].lower()             # 'c'
+            rest  = path_str[2:].replace('\\', '/') # '/Program Files/PATFIT19/res19.exe'
+            exe_path = Path(f"/mnt/{drive}{rest}")
+        else:
+            exe_path = Path(exe_path)
         pfc_path = Path(self.path)
 
         if not exe_path.exists():
