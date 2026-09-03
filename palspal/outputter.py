@@ -528,7 +528,7 @@ class PFCOutFile:
                         self.no_corr_sigma = [float(x) for x in vals]
                     continue
 
-                if "INTENSITIES (%)" in line and ":" in line:
+                if "INTENSITIES" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
                         self.no_corr_intensity = [float(x) for x in vals]
@@ -564,7 +564,7 @@ class PFCOutFile:
                         self.source_lt = [float(x) for x in vals]
                     continue
 
-                if "INTENSITIES (%)" in line and ":" in line:
+                if "INTENSITIES" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
                         self.source_intensity = [float(x) for x in vals]
@@ -631,7 +631,7 @@ class PFCOutFile:
                     continue
 
                 # intensities and intensity stddevs
-                if "INTENSITIES (%)" in line and ":" in line:
+                if "INTENSITIES" in line and ":" in line:
                     vals = self._floats_in_line(line)
                     if vals:
                         self.int = [float(x) for x in vals]

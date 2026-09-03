@@ -190,8 +190,8 @@ class RFCFile:
         for k in range(self.lt_components):
             self.lt.append(float(toks[pos + k]))
         pos += self.lt_components
-        self.int_constraint = toks[pos + k]
-        self.int_constraint_info = None # TODO
+        #self.int_constraint = toks[pos + k]
+        #self.int_constraint_info = None # TODO
 
         #==========================BLOCK 6============================
         toks = self.tokenize(self._raw_lines[header_idx_6 + 1 :])
@@ -878,13 +878,19 @@ class PFCFile:
         new_lines.append("".join(f"{as_float(x):>10.4f}" for x in ln_broadening) + "\n")
 
         new_lines.append(f"{as_int(num_int_constraint):>10d}\n")
-        if self.num_int_constraint > 0:
+        if num_int_constraint > 0:
             new_lines.append(" ".join(f"{as_int(x):>10d}" for x in self.int_constraint[0]) + "\n")
             new_lines.append(" ".join(f"{as_float(x):>10.4f}" for x in self.int_constraint[1]) + "\n")
-        elif self.num_int_constraint < 0:
-            for j in range(self.num_int_constraint):
-                new_lines.append(" ".join(f"{as_float(x):>10.4f}" for x in self.int_constraint[j]) + "\n")
-            
+        elif num_int_constraint < 0:
+            for j in range(abs(num_int_constraint)):
+                new_lines.append(
+                    "".join(
+                        f"    {as_float(x):.4f}" if as_float(x) >= 0
+                        else f"   {as_float(x):.4f}"
+                        for x in self.int_constraint[j]
+                    ) + "\n"
+                )
+
         if self.lt_components_2 is not None:
             lt_components_2 = as_int(self.lt_components_2, 1)
             lt_constraint_2 = as_str(self.lt_constraint_2, "F" * lt_components_2)
