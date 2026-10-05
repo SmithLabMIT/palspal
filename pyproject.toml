@@ -12,7 +12,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [
   { name = "Brandon C. Tapia"},
-  { name = "Zachary P. Smith", email = "smithlab_software@gmit.edu" }
+  { name = "Zachary P. Smith", email = "smithlab_software@mit.edu" }
 ]
 
 dependencies = []
@@ -29,7 +29,8 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest", "black", "build", "twine"]
-docs = ["sphinx", "sphinxcontrib-bibtex", "sphinx_copybutton",]
+docs = ["sphinx", "sphinxcontrib-bibtex", "sphinx_copybutton", "furo"]
+publish = ["build", "twine"]
 
 [tool.setuptools]
 include-package-data = true
@@ -37,6 +38,7 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["."
 ]
+
 [tool.black]
 target-version = ["py312"]
 line-length = 100
