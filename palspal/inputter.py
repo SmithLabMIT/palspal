@@ -30,7 +30,7 @@ class RFCFile:
         # There is also a hidden log-normal fineness that can be applied if desired
         # Default: 32 (e.g., 0000 32 is the same as 0000 which is the same as 0000 0)
         self.log_normal_fineness = None  # If None, it will not be printed and default to 32
-        
+
         # Block 2 data (Spectrum)
         self.num_channels = None  # Number of channels in the spectrum
         self.format = None  # Formatting of spectrum expressed in FORMAT style of FORTRAN
@@ -130,7 +130,7 @@ class RFCFile:
 
         extra = toks[0][4:].strip()
         self.log_normal_fineness = int(extra) if extra else None
-    
+
         #==========================BLOCK 2============================
         lines = self._raw_lines[header_idx_2 + 1 : header_idx_3]
 
@@ -148,7 +148,7 @@ class RFCFile:
 
         #==========================BLOCK 3============================
         toks = self.tokenize(self._raw_lines[header_idx_3 + 1:header_idx_4])
-        
+
         self.area = [toks[0], toks[1]]
         self.fit = [toks[2], toks[3]]
         self.timescale = toks[4]
